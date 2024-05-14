@@ -280,7 +280,31 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
     // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
     // Use: auto pixel_color = fragment_shader(payload);
 
- 
+    for (float j = bmin; j <= tmax; j++){
+            id = get_index(i, j);
+            if (insideTriangle(i + 0.5, j + 0.5, t.v))//取像素中心作为判断
+            { // 如果像素在三角形内
+                // If so, use the following code to get the interpolated z value.
+                std::tie(alpha, beta, gamma) = computeBarycentric2D(i + 0.5, j + 0.5, t.v);//计算得到重心
+                float w_reciprocal = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                z_interpolated *= w_reciprocal;
+
+                if (-z_interpolated < depth_buf[id])
+                {                                                                                                                                                 // 如果该像素的深度更小，更新像素深度、颜色表
+                    auto interpolated_color = interpolate(alpha, beta, gamma, t.color[0], t.color[1], t.color[2], 1);                                             // 颜色插值
+                    auto interpolated_normal = interpolate(alpha, beta, gamma, t.normal[0], t.normal[1], t.normal[2], 1).normalized();                            // 法向量插值
+                    auto interpolated_texcoords = interpolate(alpha, beta, gamma, t.tex_coords[0], t.tex_coords[1], t.tex_coords[2], 1);                          // 纹理坐标插值
+                    auto interpolated_shadingcoords = interpolate(alpha, beta, gamma, view_pos[0], view_pos[1], view_pos[2], 1);                                  // 着色点坐标插值
+                    fragment_shader_payload payload(interpolated_color, interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr); // 将插值属性传入fragment_shader_payload
+                    payload.view_pos = interpolated_shadingcoords;                                                                                                // 传入原顶点坐标
+                    depth_buf[id] = -z_interpolated;
+                    frame_buf[id] = fragment_shader(payload); // 使用shader计算颜色
+                    // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+                    set_pixel({i, j}, frame_buf[id]);
+                }
+            }
+        }
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)
