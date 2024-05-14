@@ -279,8 +279,19 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t, const std::array<Eig
     // Use: payload.view_pos = interpolated_shadingcoords;
     // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
     // Use: auto pixel_color = fragment_shader(payload);
-
-    for (float j = bmin; j <= tmax; j++){
+    
+    auto v = t.toVector4();
+    Vector3f color;
+    float alpha, beta, gamma, lmin = INT_MAX, rmax = INT_MIN, tmax = INT_MIN, bmin = INT_MAX, id;
+    for (auto &k : v){ //找到可以包围这个三角形的矩形坐标
+        lmin = int(std::min(lmin, k.x()));
+        rmax = std::max(rmax, k.x());
+        rmax = rmax == int(rmax) ? int(rmax) - 1 : rmax;
+        tmax = std::max(tmax, k.y());
+        tmax = tmax == int(tmax) ? int(tmax) - 1 : tmax;
+        bmin = int(std::min(bmin, k.y()));
+    }
+    for (float j = bmin; j <= tmax; j++){//在矩形内遍历所有点
             id = get_index(i, j);
             if (insideTriangle(i + 0.5, j + 0.5, t.v))//取像素中心作为判断
             { // 如果像素在三角形内
